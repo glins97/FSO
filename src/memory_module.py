@@ -1,3 +1,4 @@
+from src.process_module import Process
 
 class MemoryBlock():
 
@@ -63,3 +64,10 @@ class MemoryManager():
         except Exception as e:
             print('ERROR::\tfailed to write content to memory block')
             return False
+
+    def show_available_memory(self):
+        print('\nAvailable memory:')
+
+        for priority, memory_blocks in self.available_memory_blocks.items():
+            print(f'\t{Process.get_priority_description(priority)}: {memory_blocks}')
+     

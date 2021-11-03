@@ -2,6 +2,7 @@ from src.process_module import Process
 from src.resource_module import ResourceManager
 from src.memory_module import MemoryManager
 from src.queue_module import QueueManager
+from src.filesystem_module import FileSystemManager
 
 import os
 
@@ -32,6 +33,11 @@ class MiniOS():
             max_process_age=2,
         )
 
+        self.filesystem_manager  = FileSystemManager(
+            blocks=100,
+            block_size=8192,
+        )
+
     def _parse_process_description(self, start_time, priority, cpu_time, memory_blocks, printer, scanner, modem, disk):
         start_time = int(start_time)
         priority = int(priority)
@@ -44,12 +50,9 @@ class MiniOS():
 
         return start_time, priority, cpu_time, memory_blocks, printer, scanner, modem, disk
 
-    def show_available_memory(self):
-        print('\nAvailable memory:')
+    def _parse_occupied_blocks_data(self, path, starting_block, size):
+        return path, int(starting_block), int(size)
 
-        for priority, memory_blocks in self.memory_manager.available_memory_blocks.items():
-            print(f'\t{Process.get_priority_description(priority)}: {memory_blocks}')
-     
     def load_processes(self, path):
         # reads input file
         data = []
@@ -85,10 +88,31 @@ class MiniOS():
         # save to OS list of processes
         self.processes = processes
 
+    def load_files(self, path):
+        # reads input file
+        data = []
+        with open(path) as f:
+            data = f.read().split('\n')
+
+        for index, line in enumerate(data):
+            data[index] = line.split(',')
+
+        blocks = int(data[0][0])
+        occupied_blocks = int(data[1][0])
+        occupied_blocks_data = data[2:2+occupied_blocks]
+
+        self.filesystem_manager = FileSystemManager(
+            blocks=blocks,
+            block_size=1
+        )
+        for i in range(occupied_blocks):
+            self.filesystem_manager.load_block(*self._parse_occupied_blocks_data(*occupied_blocks_data[i]))
+            
+
     def start(self):
         print('------[ START ]------')
         # prints initial states
-        self.show_available_memory()
+        self.memory_manager.show_available_memory()
         self.resource_manager.show_available_resources()
         self.queue_manager.show_queues()
         print('\n==================================\n\n')
@@ -98,7 +122,14 @@ class MiniOS():
         print('------[ LOADING PROCESSES ]------')
         # loads processes, then print states
         self.load_processes('processes.txt')
-        self.show_available_memory()
+        self.memory_manager.show_available_memory()
+        print('\n==================================\n\n')
+        # time.sleep(self.quantum)
+
+        print('------[ LOADING FILES ]------')
+        # loads processes, then print states
+        self.load_files('files.txt')
+        self.filesystem_manager.show_disk_usage()
         print('\n==================================\n\n')
         # time.sleep(self.quantum)
 

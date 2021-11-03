@@ -14,25 +14,29 @@ class Block():
 
     @property
     def is_free(self):
-        return self.owner is None
+        return self.owner is None and self.path is None
 
 class FileSystemManager():
     LOCK_PATH = 'filesystem_manager.lock'
 
-    def __init__(self, base_dir='src/drives/sda1/', blocks=1024, block_size=8192):
+    def __init__(self, base_dir='src/drives/sda1/', blocks=1024, block_size=8192, use_lock=False):
         self.BASE_DIR = base_dir
         self.BLOCK_SIZE = block_size
 
         self.max_available_blocks = blocks
-        self.blocks = (Block(id=id, size=block_size) for id in range(blocks))
+        self.blocks = [Block(id=id, size=block_size) for id in range(blocks)]
+        self.use_lock = use_lock
 
-        if os.path.exists(self.LOCK_PATH):
+        if os.path.exists(self.LOCK_PATH) and self.use_lock:
             with open(self.LOCK_PATH, 'rb') as f:
                 self.paths = pickle.load(f)
         else:
             self.paths = {}
 
     def save_paths_lock(self):
+        if not self.use_lock:
+            return
+
         with open(self.LOCK_PATH, 'wb') as f:
             pickle.dump(self.paths, f)
 
@@ -57,6 +61,12 @@ class FileSystemManager():
 
     def get_utilization_map(self):
         return [ (block if not block.is_free else None) for block in self.blocks ]
+
+    def load_block(self, path, starting_block, size):
+        for block in self.blocks[starting_block:starting_block + size]:
+            block.path = path
+            block.owner = None
+        self.paths[path] = self.blocks[starting_block:starting_block + size]
 
     def create(self, bytes, path, owner):
         return self._write(bytes, path, owner)
@@ -117,3 +127,11 @@ class FileSystemManager():
             return True
         except:
             pass
+
+    def show_disk_usage(self):
+        print('Disk utilization:')
+        for block in self.blocks:
+            if block.is_free:
+                print('\tBlock {}: [   ]'.format(block.id))
+            else:
+                print('\tBlock {}: [ {} ]'.format(block.id, block.path))
