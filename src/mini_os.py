@@ -1,11 +1,17 @@
 from src.process_module import Process
 from src.resource_module import ResourceManager
 from src.memory_module import MemoryManager
+from src.queue_module import QueueManager
 
+import os
+
+DEBUG = os.environ.get('debug', 'false').lower() == 'true'
+import time
 class MiniOS():
 
-    def __init__(self) -> None:
+    def __init__(self, quantum=1) -> None:
         self.processes = {}
+        self.quantum = quantum
 
         self.memory_manager = MemoryManager(
             blocks={
@@ -19,6 +25,11 @@ class MiniOS():
             printers=2,
             modems=1,
             sata_devices=2,
+        )
+
+        self.queue_manager = QueueManager(
+            aging=1,
+            max_process_age=2,
         )
 
     def _parse_process_description(self, start_time, priority, cpu_time, memory_blocks, printer, scanner, modem, disk):
@@ -72,11 +83,42 @@ class MiniOS():
             self.memory_manager.assign_memory_blocks(memory_blocks, processes[-1])
 
         # save to OS list of processes
-        for process in processes:
-            self.processes[process.pid] = process
+        self.processes = processes
 
-        return processes
-   
     def start(self):
+        print('------[ START ]------')
+        # prints initial states
         self.show_available_memory()
         self.resource_manager.show_available_resources()
+        self.queue_manager.show_queues()
+        print('\n==================================\n\n')
+        # time.sleep(self.quantum)
+
+
+        print('------[ LOADING PROCESSES ]------')
+        # loads processes, then print states
+        self.load_processes('processes.txt')
+        self.show_available_memory()
+        print('\n==================================\n\n')
+        # time.sleep(self.quantum)
+
+        cpu_time = 0
+        finished = False
+        while not finished:
+            
+            # add processes when its start time has arrived
+            for process in self.processes:
+                if process.start_time == cpu_time:
+                    self.queue_manager.add_process(process)
+            
+            active_process = self.queue_manager.get_active_process()
+            if active_process is None:
+                active_process = ''
+
+            print(f'CPU TIME: {cpu_time}')
+            print(f'ACTIVE PROCESS: {active_process}\n')
+            self.queue_manager.run_processes()
+            
+            cpu_time += 1
+            time.sleep(self.quantum)
+
